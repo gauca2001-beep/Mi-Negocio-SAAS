@@ -48,12 +48,20 @@ const firebaseConfig = {
   measurementId: 'G-T0XBVKKSRS',
 };
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
+let app: any;
+let auth: any;
+let db: any;
+
+try {
+  app = initializeApp(firebaseConfig);
+  auth = getAuth(app);
+  db = getFirestore(app);
+} catch (error) {
+  console.error('Firebase initialization error:', error);
+}
 
 // ============================================================================
-// TYPES & INTERFACES
+// TYPES
 // ============================================================================
 interface User {
   uid: string;
@@ -95,66 +103,122 @@ interface Client {
 }
 
 // ============================================================================
-// MODAL COMPONENTS
+// LOGIN COMPONENT
 // ============================================================================
-const DeleteModal: React.FC<{
-  isOpen: boolean;
-  title: string;
-  message: string;
-  onConfirm: () => void;
-  onCancel: () => void;
-  isLoading?: boolean;
-}> = ({ isOpen, title, message, onConfirm, onCancel, isLoading = false }) => {
-  if (!isOpen) return null;
+const Login: React.FC<{
+  onLoginSuccess: (user: User) => void;
+}> = ({ onLoginSuccess }) => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+
+    // Super Admin Login
+    if (password === '123456' && (!email || email === 'admin')) {
+      onLoginSuccess({
+        uid: 'admin-' + Date.now(),
+        email: 'admin@sistema.local',
+        role: 'admin',
+      });
+      return;
+    }
+
+    // Client Login
+    if (!email || !password) {
+      setError('Por favor completa todos los campos');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      onLoginSuccess({
+        uid: userCredential.user.uid,
+        email: userCredential.user.email || '',
+        role: 'client',
+      });
+    } catch (err: any) {
+      setError(err.message || 'Error al iniciar sesión');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-sm w-full mx-4 p-6">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="bg-red-100 p-3 rounded-full">
-            <AlertCircle className="w-6 h-6 text-red-600" />
-          </div>
-          <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+    <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 flex items-center justify-center p-4">
+      <div className="w-full max-w-md">
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold text-amber-900 mb-2">
+            Mi Negocio Fácil
+          </h1>
+          <p className="text-amber-700">Sistema SaaS & POS</p>
         </div>
-        <p className="text-gray-600 mb-6">{message}</p>
-        <div className="flex gap-3 justify-end">
-          <button
-            onClick={onCancel}
-            disabled={isLoading}
-            className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50"
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={onConfirm}
-            disabled={isLoading}
-            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
-          >
-            {isLoading ? 'Eliminando...' : 'Eliminar'}
-          </button>
+
+        <div className="bg-white rounded-lg shadow-xl p-8 border border-amber-200">
+          <h2 className="text-2xl font-bold text-gray-900 mb-6">Iniciar Sesión</h2>
+
+          {error && (
+            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleLogin} className="space-y-4 mb-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Email (dejar vacío para Admin)
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-amber-600"
+                placeholder="cliente@ejemplo.com"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Contraseña (123456 para Admin)
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-amber-600"
+                placeholder="••••••••"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full px-4 py-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white rounded-lg font-semibold transition disabled:opacity-50"
+            >
+              {isLoading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
+            </button>
+          </form>
+
+          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
+            <p className="font-semibold mb-2">Credenciales de Prueba:</p>
+            <p>Admin: Contraseña: 123456</p>
+            <p className="text-xs text-blue-600 mt-2">
+              (Los clientes son creados por el admin)
+            </p>
+          </div>
         </div>
       </div>
+
+      <Toaster position="bottom-right" />
     </div>
   );
 };
 
 // ============================================================================
-// EMPTY STATE COMPONENT
-// ============================================================================
-const EmptyState: React.FC<{
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-}> = ({ icon, title, description }) => (
-  <div className="flex flex-col items-center justify-center py-12 px-4">
-    <div className="text-amber-100 mb-4">{icon}</div>
-    <h3 className="text-lg font-semibold text-gray-700 mb-2">{title}</h3>
-    <p className="text-gray-500 text-center">{description}</p>
-  </div>
-);
-
-// ============================================================================
-// ADMIN PANEL - SUPER ADMIN INTERFACE (DARK MODE)
+// ADMIN PANEL
 // ============================================================================
 const AdminPanel: React.FC<{
   user: User;
@@ -165,15 +229,8 @@ const AdminPanel: React.FC<{
   const [newClientEmail, setNewClientEmail] = useState('');
   const [newClientPassword, setNewClientPassword] = useState('');
   const [newClientExpiryDate, setNewClientExpiryDate] = useState('');
-  const [editingClient, setEditingClient] = useState<Client | null>(null);
-  const [editExpiryDate, setEditExpiryDate] = useState('');
-  const [deleteModal, setDeleteModal] = useState<{
-    isOpen: boolean;
-    clientId?: string;
-  }>({ isOpen: false });
   const [isLoading, setIsLoading] = useState(false);
 
-  // Cargar clientes
   useEffect(() => {
     const loadClients = async () => {
       try {
@@ -193,7 +250,6 @@ const AdminPanel: React.FC<{
     loadClients();
   }, []);
 
-  // Crear nuevo cliente
   const handleCreateClient = async () => {
     if (!newClientEmail || !newClientPassword || !newClientExpiryDate) {
       toast.error('Por favor completa todos los campos');
@@ -241,37 +297,21 @@ const AdminPanel: React.FC<{
     }
   };
 
-  // Actualizar fecha de vencimiento
-  const handleUpdateExpiryDate = async () => {
-    if (!editingClient || !editExpiryDate) return;
-
+  const handleDeleteClient = async (clientId: string) => {
     setIsLoading(true);
     try {
-      const clientRef = doc(db, 'clients', editingClient.id);
-      await updateDoc(clientRef, {
-        expiryDate: editExpiryDate,
-      });
-
-      setClients(
-        clients.map((c) =>
-          c.id === editingClient.id
-            ? { ...c, expiryDate: editExpiryDate }
-            : c
-        )
-      );
-
-      setEditingClient(null);
-      setEditExpiryDate('');
-      toast.success('Fecha de vencimiento actualizada');
+      const clientRef = doc(db, 'clients', clientId);
+      await deleteDoc(clientRef);
+      setClients(clients.filter((c) => c.id !== clientId));
+      toast.success('Cliente eliminado exitosamente');
     } catch (error) {
-      console.error('Error updating expiry date:', error);
-      toast.error('Error al actualizar fecha de vencimiento');
+      console.error('Error deleting client:', error);
+      toast.error('Error al eliminar cliente');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Alternar estado del cliente
   const handleToggleActive = async (clientId: string, currentStatus: boolean) => {
     setIsLoading(true);
     try {
@@ -297,27 +337,8 @@ const AdminPanel: React.FC<{
     }
   };
 
-  // Eliminar cliente
-  const handleDeleteClient = async (clientId: string) => {
-    setIsLoading(true);
-    try {
-      const clientRef = doc(db, 'clients', clientId);
-      await deleteDoc(clientRef);
-
-      setClients(clients.filter((c) => c.id !== clientId));
-      setDeleteModal({ isOpen: false });
-      toast.success('Cliente eliminado exitosamente');
-    } catch (error) {
-      console.error('Error deleting client:', error);
-      toast.error('Error al eliminar cliente');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
-      {/* Header */}
       <div className="bg-gray-800/50 backdrop-blur border-b border-amber-500/20 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
           <div>
@@ -334,9 +355,7 @@ const AdminPanel: React.FC<{
         </div>
       </div>
 
-      {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Create Client Button */}
         <div className="mb-8">
           <button
             onClick={() => setShowNewClientModal(true)}
@@ -347,14 +366,13 @@ const AdminPanel: React.FC<{
           </button>
         </div>
 
-        {/* Clients Table */}
         <div className="bg-gray-800/30 backdrop-blur border border-gray-700 rounded-lg overflow-hidden">
           {clients.length === 0 ? (
-            <EmptyState
-              icon={<Package className="w-16 h-16" />}
-              title="Sin Clientes"
-              description="Crea tu primer cliente para comenzar"
-            />
+            <div className="flex flex-col items-center justify-center py-12 px-4">
+              <Package className="w-16 h-16 text-amber-100 mb-4" />
+              <h3 className="text-lg font-semibold text-gray-700 mb-2">Sin Clientes</h3>
+              <p className="text-gray-500 text-center">Crea tu primer cliente para comenzar</p>
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -398,16 +416,6 @@ const AdminPanel: React.FC<{
                       <td className="px-6 py-4">
                         <div className="flex gap-2">
                           <button
-                            onClick={() => {
-                              setEditingClient(client);
-                              setEditExpiryDate(client.expiryDate);
-                            }}
-                            className="p-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 rounded transition"
-                            title="Editar fecha"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </button>
-                          <button
                             onClick={() =>
                               handleToggleActive(client.id, client.isActive)
                             }
@@ -416,9 +424,6 @@ const AdminPanel: React.FC<{
                                 ? 'bg-red-500/20 hover:bg-red-500/30 text-red-400'
                                 : 'bg-green-500/20 hover:bg-green-500/30 text-green-400'
                             }`}
-                            title={
-                              client.isActive ? 'Desactivar' : 'Activar'
-                            }
                           >
                             {client.isActive ? (
                               <X className="w-4 h-4" />
@@ -427,14 +432,8 @@ const AdminPanel: React.FC<{
                             )}
                           </button>
                           <button
-                            onClick={() =>
-                              setDeleteModal({
-                                isOpen: true,
-                                clientId: client.id,
-                              })
-                            }
+                            onClick={() => handleDeleteClient(client.id)}
                             className="p-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded transition"
-                            title="Eliminar"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -449,7 +448,6 @@ const AdminPanel: React.FC<{
         </div>
       </div>
 
-      {/* Create Client Modal */}
       {showNewClientModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6 border border-gray-700">
@@ -513,64 +511,13 @@ const AdminPanel: React.FC<{
         </div>
       )}
 
-      {/* Edit Expiry Date Modal */}
-      {editingClient && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6 border border-gray-700">
-            <h2 className="text-2xl font-bold text-amber-400 mb-4">
-              Editar Fecha de Vencimiento
-            </h2>
-            <p className="text-gray-400 mb-4">Cliente: {editingClient.email}</p>
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Nueva Fecha
-              </label>
-              <input
-                type="date"
-                value={editExpiryDate}
-                onChange={(e) => setEditExpiryDate(e.target.value)}
-                className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-amber-500"
-              />
-            </div>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setEditingClient(null)}
-                disabled={isLoading}
-                className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg transition disabled:opacity-50"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleUpdateExpiryDate}
-                disabled={isLoading}
-                className="flex-1 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition disabled:opacity-50 font-semibold"
-              >
-                {isLoading ? 'Actualizando...' : 'Actualizar'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Modal */}
-      <DeleteModal
-        isOpen={deleteModal.isOpen}
-        title="Eliminar Cliente"
-        message="¿Estás seguro de que deseas eliminar este cliente? Esta acción no se puede deshacer."
-        onConfirm={() =>
-          deleteModal.clientId && handleDeleteClient(deleteModal.clientId)
-        }
-        onCancel={() => setDeleteModal({ isOpen: false })}
-        isLoading={isLoading}
-      />
-
       <Toaster position="bottom-right" />
     </div>
   );
 };
 
 // ============================================================================
-// CLIENT APP - POS & INVENTORY INTERFACE (LIGHT MODE)
+// CLIENT APP
 // ============================================================================
 const ClientApp: React.FC<{
   user: User;
@@ -584,16 +531,11 @@ const ClientApp: React.FC<{
   const [newProductName, setNewProductName] = useState('');
   const [newProductPrice, setNewProductPrice] = useState('');
   const [newProductQuantity, setNewProductQuantity] = useState('');
-  const [deleteModal, setDeleteModal] = useState<{
-    isOpen: boolean;
-    productId?: string;
-  }>({ isOpen: false });
   const [isLoading, setIsLoading] = useState(false);
   const [multimonedaEnabled, setMultimonedaEnabled] = useState(false);
   const [exchangeRate, setExchangeRate] = useState(1);
   const [paymentMethod, setPaymentMethod] = useState('efectivo');
 
-  // Cargar productos
   useEffect(() => {
     const loadProducts = async () => {
       try {
@@ -607,14 +549,12 @@ const ClientApp: React.FC<{
         setProducts(productsList);
       } catch (error) {
         console.error('Error loading products:', error);
-        toast.error('Error al cargar productos');
       }
     };
 
     loadProducts();
   }, [user.uid]);
 
-  // Cargar ventas
   useEffect(() => {
     const loadSales = async () => {
       try {
@@ -634,7 +574,6 @@ const ClientApp: React.FC<{
     loadSales();
   }, [user.uid]);
 
-  // Crear producto
   const handleCreateProduct = async () => {
     if (!newProductName || !newProductPrice || !newProductQuantity) {
       toast.error('Por favor completa todos los campos');
@@ -676,15 +615,12 @@ const ClientApp: React.FC<{
     }
   };
 
-  // Eliminar producto
   const handleDeleteProduct = async (productId: string) => {
     setIsLoading(true);
     try {
       const productRef = doc(db, 'products', productId);
       await deleteDoc(productRef);
-
       setProducts(products.filter((p) => p.id !== productId));
-      setDeleteModal({ isOpen: false });
       toast.success('Producto eliminado exitosamente');
     } catch (error) {
       console.error('Error deleting product:', error);
@@ -694,7 +630,6 @@ const ClientApp: React.FC<{
     }
   };
 
-  // Agregar al carrito
   const handleAddToCart = (product: Product) => {
     const existingItem = cart.find((item) => item.id === product.id);
 
@@ -723,25 +658,10 @@ const ClientApp: React.FC<{
     }
   };
 
-  // Remover del carrito
   const handleRemoveFromCart = (productId: string) => {
     setCart(cart.filter((item) => item.id !== productId));
   };
 
-  // Actualizar cantidad en carrito
-  const handleUpdateCartQuantity = (productId: string, quantity: number) => {
-    if (quantity <= 0) {
-      handleRemoveFromCart(productId);
-    } else {
-      setCart(
-        cart.map((item) =>
-          item.id === productId ? { ...item, quantity } : item
-        )
-      );
-    }
-  };
-
-  // Procesar venta
   const handleCheckout = async () => {
     if (cart.length === 0) {
       toast.error('El carrito está vacío');
@@ -752,7 +672,6 @@ const ClientApp: React.FC<{
     try {
       const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
-      // Guardar venta
       const salesCollection = collection(db, 'sales');
       await addDoc(salesCollection, {
         items: cart,
@@ -763,7 +682,6 @@ const ClientApp: React.FC<{
         clientId: user.uid,
       });
 
-      // Actualizar inventario
       for (const item of cart) {
         const product = products.find((p) => p.id === item.id);
         if (product) {
@@ -802,7 +720,6 @@ const ClientApp: React.FC<{
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
           <div>
@@ -819,7 +736,6 @@ const ClientApp: React.FC<{
         </div>
       </div>
 
-      {/* Navigation Tabs */}
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 flex gap-8">
           {[
@@ -844,22 +760,18 @@ const ClientApp: React.FC<{
         </div>
       </div>
 
-      {/* Content */}
       <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* POS Tab */}
         {activeTab === 'pos' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Products List */}
             <div className="lg:col-span-2">
               <h2 className="text-2xl font-bold text-gray-900 mb-4">
                 Productos Disponibles
               </h2>
               {products.length === 0 ? (
-                <EmptyState
-                  icon={<Package className="w-16 h-16" />}
-                  title="Sin Productos"
-                  description="Crea productos en la sección de Inventario"
-                />
+                <div className="text-center py-12">
+                  <Package className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-500">Sin productos disponibles</p>
+                </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {products.map((product) => (
@@ -879,7 +791,7 @@ const ClientApp: React.FC<{
                       <button
                         onClick={() => handleAddToCart(product)}
                         disabled={product.quantity === 0}
-                        className="w-full px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-full px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition disabled:opacity-50"
                       >
                         Agregar al Carrito
                       </button>
@@ -889,7 +801,6 @@ const ClientApp: React.FC<{
               )}
             </div>
 
-            {/* Shopping Cart */}
             <div className="lg:col-span-1">
               <div className="bg-white border border-gray-200 rounded-lg p-6 sticky top-24">
                 <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center gap-2">
@@ -898,9 +809,7 @@ const ClientApp: React.FC<{
                 </h2>
 
                 {cart.length === 0 ? (
-                  <p className="text-gray-500 text-center py-8">
-                    Carrito vacío
-                  </p>
+                  <p className="text-gray-500 text-center py-8">Carrito vacío</p>
                 ) : (
                   <>
                     <div className="space-y-3 mb-4 max-h-96 overflow-y-auto">
@@ -934,16 +843,6 @@ const ClientApp: React.FC<{
                           Bs {cartTotal.toFixed(2)}
                         </span>
                       </div>
-                      {multimonedaEnabled && (
-                        <div className="flex justify-between mb-2 text-sm">
-                          <span className="text-gray-600">
-                            Tasa de Cambio:
-                          </span>
-                          <span className="font-semibold">
-                            1 USD = Bs {exchangeRate.toFixed(2)}
-                          </span>
-                        </div>
-                      )}
                       <div className="flex justify-between font-bold text-lg">
                         <span>Total:</span>
                         <span className="text-amber-600">
@@ -983,7 +882,6 @@ const ClientApp: React.FC<{
           </div>
         )}
 
-        {/* Inventory Tab */}
         {activeTab === 'inventory' && (
           <div>
             <div className="flex justify-between items-center mb-6">
@@ -1000,70 +898,57 @@ const ClientApp: React.FC<{
             </div>
 
             {products.length === 0 ? (
-              <EmptyState
-                icon={<Package className="w-16 h-16" />}
-                title="Sin Productos"
-                description="Crea tu primer producto para comenzar"
-              />
+              <div className="text-center py-12">
+                <Package className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                <p className="text-gray-500">Sin productos</p>
+              </div>
             ) : (
               <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-gray-50 border-b border-gray-200">
-                      <tr>
-                        <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
-                          Nombre
-                        </th>
-                        <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
-                          Precio (Bs)
-                        </th>
-                        <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
-                          Stock
-                        </th>
-                        <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
-                          Acciones
-                        </th>
+                <table className="w-full">
+                  <thead className="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
+                        Nombre
+                      </th>
+                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
+                        Precio
+                      </th>
+                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
+                        Stock
+                      </th>
+                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
+                        Acciones
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {products.map((product) => (
+                      <tr
+                        key={product.id}
+                        className="border-b border-gray-200 hover:bg-gray-50"
+                      >
+                        <td className="px-6 py-4 text-gray-900">{product.name}</td>
+                        <td className="px-6 py-4 text-gray-900">
+                          Bs {product.price.toFixed(2)}
+                        </td>
+                        <td className="px-6 py-4 text-gray-900">{product.quantity}</td>
+                        <td className="px-6 py-4">
+                          <button
+                            onClick={() => handleDeleteProduct(product.id)}
+                            className="p-2 text-red-600 hover:bg-red-50 rounded"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {products.map((product) => (
-                        <tr
-                          key={product.id}
-                          className="border-b border-gray-200 hover:bg-gray-50 transition"
-                        >
-                          <td className="px-6 py-4 text-gray-900">
-                            {product.name}
-                          </td>
-                          <td className="px-6 py-4 text-gray-900">
-                            {product.price.toFixed(2)}
-                          </td>
-                          <td className="px-6 py-4 text-gray-900">
-                            {product.quantity}
-                          </td>
-                          <td className="px-6 py-4">
-                            <button
-                              onClick={() =>
-                                setDeleteModal({
-                                  isOpen: true,
-                                  productId: product.id,
-                                })
-                              }
-                              className="p-2 text-red-600 hover:bg-red-50 rounded transition"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>
         )}
 
-        {/* Sales Tab */}
         {activeTab === 'sales' && (
           <div>
             <h2 className="text-2xl font-bold text-gray-900 mb-6">
@@ -1071,11 +956,10 @@ const ClientApp: React.FC<{
             </h2>
 
             {sales.length === 0 ? (
-              <EmptyState
-                icon={<BarChart3 className="w-16 h-16" />}
-                title="Sin Ventas"
-                description="Realiza tu primera venta para ver el historial"
-              />
+              <div className="text-center py-12">
+                <BarChart3 className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                <p className="text-gray-500">Sin ventas registradas</p>
+              </div>
             ) : (
               <div className="space-y-4">
                 {sales.map((sale) => (
@@ -1097,31 +981,17 @@ const ClientApp: React.FC<{
                         </p>
                       </div>
                       <div>
-                        <p className="text-sm text-gray-600">Método de Pago</p>
+                        <p className="text-sm text-gray-600">Método</p>
                         <p className="font-semibold text-gray-900 capitalize">
                           {sale.paymentMethod}
                         </p>
                       </div>
                       <div>
                         <p className="text-sm text-gray-600">Total</p>
-                        <p className="font-semibold text-amber-600 text-lg">
-                          {sale.exchangeRate ? 'USD' : 'Bs'}{' '}
-                          {sale.total.toFixed(2)}
+                        <p className="font-semibold text-amber-600">
+                          Bs {sale.total.toFixed(2)}
                         </p>
                       </div>
-                    </div>
-                    <div className="border-t border-gray-200 pt-4">
-                      <p className="text-sm font-semibold text-gray-900 mb-2">
-                        Productos:
-                      </p>
-                      <ul className="space-y-1 text-sm text-gray-600">
-                        {sale.items.map((item, idx) => (
-                          <li key={idx}>
-                            {item.name} x{item.quantity} = Bs{' '}
-                            {(item.price * item.quantity).toFixed(2)}
-                          </li>
-                        ))}
-                      </ul>
                     </div>
                   </div>
                 ))}
@@ -1130,15 +1000,13 @@ const ClientApp: React.FC<{
           </div>
         )}
 
-        {/* Settings Tab */}
         {activeTab === 'settings' && (
           <div className="max-w-2xl">
             <h2 className="text-2xl font-bold text-gray-900 mb-6">
-              Configuración Regional
+              Configuración
             </h2>
 
             <div className="bg-white border border-gray-200 rounded-lg p-6 space-y-6">
-              {/* Multimoneda */}
               <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                 <div>
                   <h3 className="font-semibold text-gray-900 flex items-center gap-2">
@@ -1161,7 +1029,6 @@ const ClientApp: React.FC<{
                 </button>
               </div>
 
-              {/* Exchange Rate */}
               {multimonedaEnabled && (
                 <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
                   <label className="block text-sm font-medium text-gray-900 mb-2">
@@ -1171,65 +1038,17 @@ const ClientApp: React.FC<{
                     type="number"
                     value={exchangeRate}
                     onChange={(e) => setExchangeRate(parseFloat(e.target.value))}
-                    className="w-full px-4 py-2 border border-amber-300 rounded-lg focus:outline-none focus:border-amber-600"
+                    className="w-full px-4 py-2 border border-amber-300 rounded-lg"
                     step="0.01"
                     min="0"
                   />
                 </div>
               )}
-
-              {/* Payment Methods Info */}
-              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <CreditCard className="w-5 h-5 text-blue-600" />
-                  Métodos de Pago Disponibles
-                </h3>
-                <ul className="space-y-2 text-sm text-gray-700">
-                  <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-green-600" />
-                    Efectivo
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-green-600" />
-                    Pago Móvil
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-green-600" />
-                    Zelle
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-green-600" />
-                    Punto (POS)
-                  </li>
-                </ul>
-              </div>
-
-              {/* Account Info */}
-              <div className="p-4 bg-gray-50 rounded-lg">
-                <h3 className="font-semibold text-gray-900 mb-3">
-                  Información de Cuenta
-                </h3>
-                <div className="space-y-2 text-sm">
-                  <p>
-                    <span className="text-gray-600">Email:</span>{' '}
-                    <span className="font-semibold text-gray-900">
-                      {user.email}
-                    </span>
-                  </p>
-                  <p>
-                    <span className="text-gray-600">Tipo de Cuenta:</span>{' '}
-                    <span className="font-semibold text-gray-900 capitalize">
-                      Cliente
-                    </span>
-                  </p>
-                </div>
-              </div>
             </div>
           </div>
         )}
       </div>
 
-      {/* New Product Modal */}
       {showNewProductModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
@@ -1239,13 +1058,13 @@ const ClientApp: React.FC<{
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Nombre del Producto
+                  Nombre
                 </label>
                 <input
                   type="text"
                   value={newProductName}
                   onChange={(e) => setNewProductName(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-amber-600"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg"
                   placeholder="Ej: Laptop"
                 />
               </div>
@@ -1257,7 +1076,7 @@ const ClientApp: React.FC<{
                   type="number"
                   value={newProductPrice}
                   onChange={(e) => setNewProductPrice(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-amber-600"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg"
                   placeholder="0.00"
                   step="0.01"
                   min="0"
@@ -1265,13 +1084,13 @@ const ClientApp: React.FC<{
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Cantidad en Stock
+                  Stock
                 </label>
                 <input
                   type="number"
                   value={newProductQuantity}
                   onChange={(e) => setNewProductQuantity(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-amber-600"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg"
                   placeholder="0"
                   min="0"
                 />
@@ -1281,14 +1100,14 @@ const ClientApp: React.FC<{
               <button
                 onClick={() => setShowNewProductModal(false)}
                 disabled={isLoading}
-                className="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-900 rounded-lg transition disabled:opacity-50"
+                className="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-900 rounded-lg"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleCreateProduct}
                 disabled={isLoading}
-                className="flex-1 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition disabled:opacity-50 font-semibold"
+                className="flex-1 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-semibold"
               >
                 {isLoading ? 'Creando...' : 'Crear'}
               </button>
@@ -1297,167 +1116,38 @@ const ClientApp: React.FC<{
         </div>
       )}
 
-      {/* Delete Modal */}
-      <DeleteModal
-        isOpen={deleteModal.isOpen}
-        title="Eliminar Producto"
-        message="¿Estás seguro de que deseas eliminar este producto? Esta acción no se puede deshacer."
-        onConfirm={() =>
-          deleteModal.productId && handleDeleteProduct(deleteModal.productId)
-        }
-        onCancel={() => setDeleteModal({ isOpen: false })}
-        isLoading={isLoading}
-      />
-
       <Toaster position="bottom-right" />
     </div>
   );
 };
 
 // ============================================================================
-// LOGIN COMPONENT
-// ============================================================================
-const Login: React.FC<{
-  onLoginSuccess: (user: User) => void;
-}> = ({ onLoginSuccess }) => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
-
-  const handleLogin = async () => {
-    setError('');
-
-    // Super Admin Login
-    if (password === '123456' && (!email || email === 'admin')) {
-      onLoginSuccess({
-        uid: 'admin',
-        email: 'admin@sistema.local',
-        role: 'admin',
-      });
-      return;
-    }
-
-    // Client Login
-    if (!email || !password) {
-      setError('Por favor completa todos los campos');
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      const userCredential = await signInWithEmailAndPassword(
-        auth,
-        email,
-        password
-      );
-      onLoginSuccess({
-        uid: userCredential.user.uid,
-        email: userCredential.user.email || '',
-        role: 'client',
-      });
-    } catch (err: any) {
-      setError(err.message || 'Error al iniciar sesión');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        {/* Logo/Title */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-amber-900 mb-2">
-            Mi Negocio Fácil
-          </h1>
-          <p className="text-amber-700">Sistema SaaS & POS</p>
-        </div>
-
-        {/* Login Card */}
-        <div className="bg-white rounded-lg shadow-xl p-8 border border-amber-200">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">Iniciar Sesión</h2>
-
-          {error && (
-            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-              {error}
-            </div>
-          )}
-
-          <div className="space-y-4 mb-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Email (dejar vacío para Admin)
-              </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-amber-600"
-                placeholder="cliente@ejemplo.com"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Contraseña (123456 para Admin)
-              </label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-amber-600"
-                placeholder="••••••••"
-              />
-            </div>
-          </div>
-
-          <button
-            onClick={handleLogin}
-            disabled={isLoading}
-            className="w-full px-4 py-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white rounded-lg font-semibold transition disabled:opacity-50"
-          >
-            {isLoading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
-          </button>
-
-          {/* Info Box */}
-          <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
-            <p className="font-semibold mb-2">Credenciales de Prueba:</p>
-            <p>Admin: Contraseña: 123456</p>
-            <p className="text-xs text-blue-600 mt-2">
-              (Los clientes son creados por el admin)
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <Toaster position="bottom-right" />
-    </div>
-  );
-};
-
-// ============================================================================
-// MAIN APP COMPONENT
+// MAIN APP
 // ============================================================================
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check Firebase auth state
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      if (firebaseUser) {
-        setUser({
-          uid: firebaseUser.uid,
-          email: firebaseUser.email || '',
-          role: 'client',
-        });
-      } else {
-        setUser(null);
-      }
-      setLoading(false);
-    });
+    try {
+      const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+        if (firebaseUser) {
+          setUser({
+            uid: firebaseUser.uid,
+            email: firebaseUser.email || '',
+            role: 'client',
+          });
+        } else {
+          setUser(null);
+        }
+        setLoading(false);
+      });
 
-    return () => unsubscribe();
+      return () => unsubscribe();
+    } catch (error) {
+      console.error('Auth error:', error);
+      setLoading(false);
+    }
   }, []);
 
   const handleLoginSuccess = (newUser: User) => {
