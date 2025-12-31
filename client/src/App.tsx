@@ -250,24 +250,9 @@ const AdminPanel: React.FC<{
     loadClients();
   }, []);
 
-  const isValidEmail = (email: string) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-  };
-
   const handleCreateClient = async () => {
     if (!newClientEmail || !newClientPassword || !newClientExpiryDate) {
       toast.error('Por favor completa todos los campos');
-      return;
-    }
-
-    if (!isValidEmail(newClientEmail)) {
-      toast.error('Por favor ingresa un email válido (ejemplo@dominio.com)');
-      return;
-    }
-
-    if (newClientPassword.length < 6) {
-      toast.error('La contraseña debe tener al menos 6 caracteres');
       return;
     }
 
@@ -306,17 +291,7 @@ const AdminPanel: React.FC<{
       toast.success('Cliente creado exitosamente');
     } catch (error: any) {
       console.error('Error creating client:', error);
-      let errorMessage = 'Error al crear cliente';
-      
-      if (error.code === 'auth/email-already-in-use') {
-        errorMessage = 'Este email ya está registrado';
-      } else if (error.code === 'auth/invalid-email') {
-        errorMessage = 'Email inválido';
-      } else if (error.code === 'auth/weak-password') {
-        errorMessage = 'La contraseña es muy débil';
-      }
-      
-      toast.error(errorMessage);
+      toast.error(error.message || 'Error al crear cliente');
     } finally {
       setIsLoading(false);
     }
