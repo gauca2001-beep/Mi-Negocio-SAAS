@@ -17,7 +17,6 @@ import {
   getDocs,
   query,
   where,
-  setDoc,
 } from 'firebase/firestore';
 import {
   LogOut,
@@ -31,10 +30,8 @@ import {
   X,
   Check,
   AlertCircle,
-  Calendar,
   DollarSign,
   CreditCard,
-  Smartphone,
 } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 
@@ -62,9 +59,6 @@ interface User {
   uid: string;
   email: string;
   role: 'admin' | 'client';
-  clientId?: string;
-  expiryDate?: string;
-  isActive?: boolean;
 }
 
 interface Product {
@@ -208,14 +202,12 @@ const AdminPanel: React.FC<{
 
     setIsLoading(true);
     try {
-      // Crear usuario en Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         newClientEmail,
         newClientPassword
       );
 
-      // Guardar cliente en Firestore
       const clientRef = collection(db, 'clients');
       await addDoc(clientRef, {
         email: newClientEmail,
@@ -1325,7 +1317,9 @@ const ClientApp: React.FC<{
 // ============================================================================
 // LOGIN COMPONENT
 // ============================================================================
-const Login: React.FC = () => {
+const Login: React.FC<{
+  onLoginSuccess: (user: User) => void;
+}> = ({ onLoginSuccess }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -1336,16 +1330,11 @@ const Login: React.FC = () => {
 
     // Super Admin Login
     if (password === '123456' && (!email || email === 'admin')) {
-      try {
-        setIsLoading(true);
-        // Crear una sesión de admin sin autenticación real
-        localStorage.setItem('adminSession', 'true');
-        window.location.reload();
-      } catch (err) {
-        setError('Error al iniciar sesión como admin');
-      } finally {
-        setIsLoading(false);
-      }
+      onLoginSuccess({
+        uid: 'admin',
+        email: 'admin@sistema.local',
+        role: 'admin',
+      });
       return;
     }
 
@@ -1362,7 +1351,11 @@ const Login: React.FC = () => {
         email,
         password
       );
-      console.log('User logged in:', userCredential.user);
+      onLoginSuccess({
+        uid: userCredential.user.uid,
+        email: userCredential.user.email || '',
+        role: 'client',
+      });
     } catch (err: any) {
       setError(err.message || 'Error al iniciar sesión');
     } finally {
@@ -1450,18 +1443,6 @@ export default function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check for admin session
-    const adminSession = localStorage.getItem('adminSession');
-    if (adminSession) {
-      setUser({
-        uid: 'admin',
-        email: 'admin@sistema.local',
-        role: 'admin',
-      });
-      setLoading(false);
-      return;
-    }
-
     // Check Firebase auth state
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
@@ -1479,16 +1460,14 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
+  const handleLoginSuccess = (newUser: User) => {
+    setUser(newUser);
+  };
+
   const handleLogout = async () => {
     try {
-      const adminSession = localStorage.getItem('adminSession');
-      if (adminSession) {
-        localStorage.removeItem('adminSession');
-        setUser(null);
-      } else {
-        await signOut(auth);
-        setUser(null);
-      }
+      await signOut(auth);
+      setUser(null);
     } catch (error) {
       console.error('Error logging out:', error);
       toast.error('Error al cerrar sesión');
@@ -1507,7 +1486,7 @@ export default function App() {
   }
 
   if (!user) {
-    return <Login />;
+    return <Login onLoginSuccess={handleLoginSuccess} />;
   }
 
   return user.role === 'admin' ? (
