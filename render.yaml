@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: mi-negocio-saas
+    runtime: node
+    plan: free
+    buildCommand: pnpm install && pnpm build
+    startCommand: NODE_ENV=production node dist/index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
