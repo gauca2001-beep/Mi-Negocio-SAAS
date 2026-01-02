@@ -10,11 +10,9 @@ async function startServer() {
   const app = express();
   const server = createServer(app);
 
-  // Serve static files from dist/public in production
-  const staticPath =
-    process.env.NODE_ENV === "production"
-      ? path.resolve(__dirname, "public")
-      : path.resolve(__dirname, "..", "dist", "public");
+  // In production, files are in dist/public (after esbuild bundles them)
+  // In development, files are in dist/public (after vite build)
+  const staticPath = path.resolve(__dirname, "..", "dist", "public");
 
   app.use(express.static(staticPath));
 
@@ -27,6 +25,7 @@ async function startServer() {
 
   server.listen(port, () => {
     console.log(`Server running on http://localhost:${port}/`);
+    console.log(`Serving static files from: ${staticPath}`);
   });
 }
 
